@@ -186,17 +186,26 @@ namespace FluentAdsClient
             {
                 var plcVariable = AllVariables[i];
                 dynamic dataType = plcVariable.NativeType;
-                ResultWrite n = await Client.WriteAnyAsync(variableHandle : plcVariable.Handler,
+                try
+                {
+                    ResultWrite n = await Client.WriteAnyAsync(variableHandle : plcVariable.Handler,
                                                             value : Convert.ChangeType(WriteValue, dataType),
                                                             args : plcVariable.Marshall, 
                                                             cancel : new CancellationToken());
-                if(n.Failed)
+                    if(n.Failed)
+                    {
+                        System.Console.WriteLine("Failed to write value");
+                        return false;
+                    }
+                    System.Console.WriteLine($"Successfully wrote {WriteValue} to {plcVariable.Name}");
+                    return true;
+                }
+                catch
                 {
-                    System.Console.WriteLine("Failed to write value");
+                    System.Console.WriteLine("Cannot convert convert given value to target datatype");
                     return false;
                 }
-                System.Console.WriteLine($"Successfully wrote {WriteValue} to {plcVariable.Name}");
-                return true;
+                
             }
             System.Console.WriteLine("Variable not found");
             return false;
