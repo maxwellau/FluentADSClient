@@ -26,16 +26,17 @@ namespace Program
             await plc.WriteToVariable("IO.nThing2", 588);
 
             // for constant polling with client that is declared in line 15 (plc)
-            async Task pollInfinite()
-            {
-                while(true)
-                {
-                    AllVariables = await plc.ReadAll(AllVariables);
-                    await Task.Delay(20);
-                }
-            }
-            pollInfinite();
-            Console.ReadKey();
+            // async Task pollInfinite()
+            // {
+            //     while(true)
+            //     {
+            //         AllVariables = await plc.ReadAll(AllVariables);
+            //         await Task.Delay(20);
+            //     }
+            // }
+            // await pollInfinite();
+            var nigga = await plc.ReadSingleVariable("IO.nThing2");
+            System.Console.WriteLine(nigga);
         }
     }
 }

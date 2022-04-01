@@ -129,15 +129,16 @@ namespace FluentAdsClient
             Dictionary<string, dynamic> PlcVariablesToNativeType = new Dictionary<string, dynamic>(); // create new hashtable of tcvariable to native c# datatype
             foreach(var n in DecodedTCVariables)
             {
+                //  i would use case but the case syntax for different c# versions are different, so i aint risking it lol
                 if (n.Value == "BOOL") PlcVariablesToNativeType.Add(n.Key, typeof(bool)); // map BOOL to native boolean
                 if (n.Value == "BYTE") PlcVariablesToNativeType.Add(n.Key, typeof(byte)); // map BYTE to native byte
                 if (n.Value == "UINT") PlcVariablesToNativeType.Add(n.Key, typeof(ushort)); // map UINT to native ushort
                 if (n.Value == "INT") PlcVariablesToNativeType.Add(n.Key, typeof(short)); // map INT to native short
                 if (n.Value == "DINT") PlcVariablesToNativeType.Add(n.Key, typeof(int)); // map DINT to native int
-                if (n.Value == "UDINT") PlcVariablesToNativeType.Add(n.Key, typeof(uint)); // map DINT to native int
+                if (n.Value == "UDINT") PlcVariablesToNativeType.Add(n.Key, typeof(uint)); // map DINT to native uint
                 if (n.Value == "REAL") PlcVariablesToNativeType.Add(n.Key, typeof(float)); // map REAL to native float
-                if (n.Value == "LREAL") PlcVariablesToNativeType.Add(n.Key, typeof(double)); // map REAL to native float
-                if (n.Value == "STRING(80)") PlcVariablesToNativeType.Add(n.Key, typeof(string)); // map REAL to native string
+                if (n.Value == "LREAL") PlcVariablesToNativeType.Add(n.Key, typeof(double)); // map LREAL to native double
+                if (n.Value == "STRING(80)") PlcVariablesToNativeType.Add(n.Key, typeof(string)); // map STRING(80) to native string
             }
             return PlcVariablesToNativeType;
         }
@@ -174,6 +175,41 @@ namespace FluentAdsClient
                 }
             return AllVariables;
         }
+        public async Task<dynamic> ReadSingleVariable(string VariableName)
+        {
+            if(!Client.IsConnected) // check if connection is alive
+            {
+                System.Console.WriteLine("Client Not Connected"); 
+                return null;
+            }
+            int i = GetIndexFromString(VariableName, AllVariables); // get index from list of plc class, returns -1 if not found
+            if(i != -1)
+            {
+                var plcVariable = AllVariables[i];
+                dynamic dataType = plcVariable.NativeType;
+                try
+                {
+                    plcVariable.Value = await Client.ReadAnyAsync(variableHandle : plcVariable.Handler,
+                                                        type : plcVariable.NativeType,
+                                                        args : plcVariable.Marshall,
+                                                        cancel: new CancellationToken());
+                    if(plcVariable.Value.Failed)
+                    {
+                        System.Console.WriteLine("Failed to read value");
+                        return null;
+                    }
+                    System.Console.WriteLine($"{plcVariable.Name} value is {plcVariable.State}"); // Note the getter and setter in PlcVariableClass
+                    return plcVariable.State;
+                }
+                catch
+                {
+                    System.Console.WriteLine("Cannot convert target datatype to C# datatype");
+                    return null;
+                }
+            }
+            System.Console.WriteLine("Variable not found");
+            return null;
+        }
         public async Task<bool> WriteToVariable(string VariableName, dynamic WriteValue)
         {
             if(!Client.IsConnected) // check if connection is alive
@@ -181,7 +217,7 @@ namespace FluentAdsClient
                 System.Console.WriteLine("Client Not Connected");
                 return false;
             }
-            int i = GetIndexFromString(VariableName, AllVariables);
+            int i = GetIndexFromString(VariableName, AllVariables); // get index from list of plc class, returns -1 if not found
             if(i != -1)
             {
                 var plcVariable = AllVariables[i];
@@ -191,7 +227,7 @@ namespace FluentAdsClient
                     ResultWrite n = await Client.WriteAnyAsync(variableHandle : plcVariable.Handler,
                                                             value : Convert.ChangeType(WriteValue, dataType),
                                                             args : plcVariable.Marshall, 
-                                                            cancel : new CancellationToken());
+                                                            cancel : new CancellationToken()); //writes to plc
                     if(n.Failed)
                     {
                         System.Console.WriteLine("Failed to write value");
