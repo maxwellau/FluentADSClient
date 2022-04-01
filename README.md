@@ -17,3 +17,5 @@
 ### AllVariables = await plc.ReadAll(AllVariables);
 ---
 ## Note: If you want to constantly poll the states in a Real-Time application, you may create an async Task to constantly read the variable states
+# Enquiries
+## Email me at maxweliau12345@gmail.com if you have any questions
