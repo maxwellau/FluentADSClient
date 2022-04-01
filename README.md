@@ -25,7 +25,7 @@
         while(true)
         {
             AllVariables = await plc.ReadAll(AllVariables);
-            Task.Delay(20);
+            await Task.Delay(20);
         }
     }
     pollInfinite();
