@@ -130,8 +130,13 @@ namespace FluentAdsClient
             foreach(var n in DecodedTCVariables)
             {
                 if (n.Value == "BOOL") PlcVariablesToNativeType.Add(n.Key, typeof(bool)); // map BOOL to native boolean
-                if (n.Value == "INT") PlcVariablesToNativeType.Add(n.Key, typeof(Int16)); // map INT to native int16
+                if (n.Value == "BYTE") PlcVariablesToNativeType.Add(n.Key, typeof(byte)); // map BYTE to native byte
+                if (n.Value == "UINT") PlcVariablesToNativeType.Add(n.Key, typeof(ushort)); // map UINT to native ushort
+                if (n.Value == "INT") PlcVariablesToNativeType.Add(n.Key, typeof(short)); // map INT to native short
+                if (n.Value == "DINT") PlcVariablesToNativeType.Add(n.Key, typeof(int)); // map DINT to native int
+                if (n.Value == "UDINT") PlcVariablesToNativeType.Add(n.Key, typeof(uint)); // map DINT to native int
                 if (n.Value == "REAL") PlcVariablesToNativeType.Add(n.Key, typeof(float)); // map REAL to native float
+                if (n.Value == "LREAL") PlcVariablesToNativeType.Add(n.Key, typeof(double)); // map REAL to native float
                 if (n.Value == "STRING(80)") PlcVariablesToNativeType.Add(n.Key, typeof(string)); // map REAL to native string
             }
             return PlcVariablesToNativeType;
@@ -152,24 +157,39 @@ namespace FluentAdsClient
         }
         public async Task<List<PlcVariableClass>> ReadAll(List<PlcVariableClass> AllVariables, int sleepTime = 50)
         {
+            if(!Client.IsConnected) // check if connection is alive
+            {
+                System.Console.WriteLine("Client Not Connected");
+                return new List<PlcVariableClass>{new PlcVariableClass("PLC NOT CONNECTED", typeof(string))};
+            }
             //start reading async
             foreach(var l in AllVariables)
                 {
                     //note the getter and setter in the plc variable class
-                    l.Value = await Client.ReadAnyAsync(l.Handler, l.NativeType, l.Marshall, new CancellationToken());
+                    l.Value = await Client.ReadAnyAsync(variableHandle : l.Handler,
+                                                        type : l.NativeType,
+                                                        args : l.Marshall,
+                                                        cancel: new CancellationToken());
                     Console.WriteLine($"{l.Name}\t{l.State}");
                 }
             return AllVariables;
         }
         public async Task<bool> WriteToVariable(string VariableName, dynamic WriteValue)
         {
+            if(!Client.IsConnected) // check if connection is alive
+            {
+                System.Console.WriteLine("Client Not Connected");
+                return false;
+            }
             int i = GetIndexFromString(VariableName, AllVariables);
             if(i != -1)
             {
                 var plcVariable = AllVariables[i];
                 dynamic dataType = plcVariable.NativeType;
-                System.Console.WriteLine(dataType);
-                ResultWrite n = await Client.WriteAnyAsync(plcVariable.Handler, Convert.ChangeType(WriteValue, dataType), plcVariable.Marshall, new CancellationToken());
+                ResultWrite n = await Client.WriteAnyAsync(variableHandle : plcVariable.Handler,
+                                                            value : Convert.ChangeType(WriteValue, dataType),
+                                                            args : plcVariable.Marshall, 
+                                                            cancel : new CancellationToken());
                 if(n.Failed)
                 {
                     System.Console.WriteLine("Failed to write value");
