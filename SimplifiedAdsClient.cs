@@ -40,6 +40,7 @@ namespace FluentAdsClient
             public ResultAnyValue Value { get; set; }
             public dynamic State { get { return Value.Value; } }
             public uint Handler { get; set; }
+            public int[] Marshall { get; set; }
         }
 
         #endregion
@@ -52,6 +53,17 @@ namespace FluentAdsClient
             return this.Client.IsConnected;
         }
 
+        private static int GetIndexFromString(string Name, List<PlcVariableClass> ClassList)
+        {
+            for(int i = 0; i < ClassList.Count; i++)
+            {
+                if(Name == ClassList[i].Name)
+                {
+                    return i;
+                }
+            }
+            return -1;
+        }
 
         // internal helper function to filter unneeded namespaces
         private static bool IncludeVariable(string child, string[] parent)
@@ -66,6 +78,11 @@ namespace FluentAdsClient
             return true;
         }
         #endregion
+        private static int[] AutoMarshaller(PlcVariableClass plcVariable)
+        {
+            if(plcVariable.NativeType == typeof(string)) return new int[] {80};
+            return null;
+        }
 
         #region main logic methods within this class
         public Dictionary<string, dynamic> GetAllSymbols()
@@ -98,6 +115,10 @@ namespace FluentAdsClient
                     }
                 } 
             }
+            foreach(var v in PlcVariableToType)
+            {
+                System.Console.WriteLine(v.Key + "\t" + v.Value);
+            }
             // convert hashtable of {string:string} to native c# {string:datatype} and return
             return MapTwincatVariablesToCSharpVariables(PlcVariableToType); 
         }
@@ -111,6 +132,7 @@ namespace FluentAdsClient
                 if (n.Value == "BOOL") PlcVariablesToNativeType.Add(n.Key, typeof(bool)); // map BOOL to native boolean
                 if (n.Value == "INT") PlcVariablesToNativeType.Add(n.Key, typeof(Int16)); // map INT to native int16
                 if (n.Value == "REAL") PlcVariablesToNativeType.Add(n.Key, typeof(float)); // map REAL to native float
+                if (n.Value == "STRING(80)") PlcVariablesToNativeType.Add(n.Key, typeof(string)); // map REAL to native string
             }
             return PlcVariablesToNativeType;
         }
@@ -121,7 +143,11 @@ namespace FluentAdsClient
             // Iteratively append each element of hashtable into AllVariables list
             foreach (var p in PlcToNativeVariables) { AllVariables.Add(new PlcVariableClass(p.Key, p.Value)); }
             // define variable handler iteratively
-            foreach (var l in AllVariables) { l.Handler = Client.CreateVariableHandle(l.Name); }
+            foreach (var l in AllVariables) 
+            { 
+                l.Handler = Client.CreateVariableHandle(l.Name); 
+                l.Marshall = AutoMarshaller(l);
+            }
             return AllVariables;
         }
         public async Task<List<PlcVariableClass>> ReadAll(List<PlcVariableClass> AllVariables, int sleepTime = 50)
@@ -130,10 +156,30 @@ namespace FluentAdsClient
             foreach(var l in AllVariables)
                 {
                     //note the getter and setter in the plc variable class
-                    l.Value = await Client.ReadAnyAsync(l.Handler, l.NativeType, new CancellationToken());
+                    l.Value = await Client.ReadAnyAsync(l.Handler, l.NativeType, l.Marshall, new CancellationToken());
                     Console.WriteLine($"{l.Name}\t{l.State}");
                 }
             return AllVariables;
+        }
+        public async Task<bool> WriteToVariable(string VariableName, dynamic WriteValue)
+        {
+            int i = GetIndexFromString(VariableName, AllVariables);
+            if(i != -1)
+            {
+                var plcVariable = AllVariables[i];
+                dynamic dataType = plcVariable.NativeType;
+                System.Console.WriteLine(dataType);
+                ResultWrite n = await Client.WriteAnyAsync(plcVariable.Handler, Convert.ChangeType(WriteValue, dataType), plcVariable.Marshall, new CancellationToken());
+                if(n.Failed)
+                {
+                    System.Console.WriteLine("Failed to write value");
+                    return false;
+                }
+                System.Console.WriteLine($"Successfully wrote {WriteValue} to {plcVariable.Name}");
+                return true;
+            }
+            System.Console.WriteLine("Variable not found");
+            return false;
         }
         #endregion
     }   

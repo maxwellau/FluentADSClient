@@ -16,6 +16,7 @@ namespace Program
             Dictionary<string, dynamic> SymbolsDictionary = plc.GetAllSymbols();
             var AllVariables = plc.ConvertPlcDictionaryToClassList(SymbolsDictionary);
             AllVariables = await plc.ReadAll(AllVariables);
+            await plc.WriteToVariable("IO.nThing2", "55");
             Console.ReadKey();
         }
     }
